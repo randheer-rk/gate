@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Gate</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230f766e'/%3E%3Ccircle cx='10' cy='16' r='5' fill='white'/%3E%3Ccircle cx='23' cy='16' r='4' fill='none' stroke='white' stroke-width='2.4'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap" rel="stylesheet">
+<style>
+/* Neutral greys with one teal accent. Teal marks the selection, running work and the viewer's own messages only. */
+:root {
+  --canvas: #f6f8f8; --sidebar: #eceff0; --panel: #ffffff; --raised: #e9edee; --line: #dde2e4;
+  --text: #141d1d; --muted: #566366; --faint: #8a9699;
+  --accent: #0f766e; --on-accent: #ffffff; --accent-soft: #d3eeea;
+  --info: #4853c9; --success: #177a3e; --danger: #c02626; --warning: #a85a08;
+  --add-bg: #e3f3e8; --del-bg: #fbe9e9; --hover: rgba(20,29,29,.06);
+  --sans: "Geist", ui-sans-serif, system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #171c20; --sidebar: #12171a; --panel: #1e252a; --raised: #262f35; --line: #2a343a;
+    --text: #e6ecee; --muted: #9ba8ac; --faint: #6b787c;
+    --accent: #2dd4bf; --on-accent: #052e2a; --accent-soft: #12403b;
+    --info: #98a4ff; --success: #4ade80; --danger: #f87171; --warning: #fbbf24;
+    --add-bg: #173326; --del-bg: #3a2023; --hover: rgba(230,236,238,.07);
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--canvas); color: var(--text); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; accent-color: var(--accent); caret-color: var(--accent); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+code, pre, .mono { font-family: var(--mono); }
+::selection { background: var(--accent-soft); color: var(--text); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.app { height: 100%; display: grid; grid-template-columns: 216px minmax(0, 1fr); }
+
+/* ---------- sidebar ---------- */
+aside { background: var(--sidebar); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 14px 14px 13px; border-bottom: 1px solid var(--line); }
+.brand .tile { width: 32px; height: 32px; border-radius: 9px; background: var(--accent); display: grid; place-items: center; }
+.brand .tile svg { width: 21px; fill: var(--on-accent); }
+.brand b { display: block; font-weight: 600; line-height: 1.2; }
+.brand small { font-size: 12px; color: var(--muted); }
+.side-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 10px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; color: var(--muted); }
+.nav-item:hover { background: var(--hover); color: var(--text); }
+.nav-item[aria-current="page"] { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); font-weight: 500; }
+.nav-item span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.count { font: 500 11px/1 var(--mono); padding: 3px 6px; border-radius: 6px; background: var(--raised); color: var(--muted); font-variant-numeric: tabular-nums; }
+.nav-item[aria-current="page"] .count { background: var(--accent-soft); color: var(--accent); }
+.count.alert { background: var(--warning); color: var(--panel); }
+.side-label { margin: 18px 10px 6px; font-size: 11px; letter-spacing: .08em; color: var(--faint); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; }
+.dot.running { background: var(--accent); } .dot.blocked_on_permission { background: var(--warning); } .dot.failed, .dot.cancelled { background: var(--danger); }
+.conn { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.conn .dot { background: var(--danger); } .conn.on .dot { background: var(--accent); }
+
+/* ---------- main ---------- */
+main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.head { padding: 16px 20px 0; border-bottom: 1px solid var(--line); }
+.head-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; background: var(--raised); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.badge.running { background: var(--accent-soft); color: var(--accent); }
+.badge.blocked_on_permission { color: var(--warning); } .badge.failed, .badge.cancelled { color: var(--danger); }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.facts span { display: inline-flex; align-items: center; gap: 6px; } .facts .mono { font-size: 11.5px; }
+.tabs { display: flex; gap: 4px; margin-top: 12px; overflow-x: auto; }
+.tabs button, .tabs a { padding: 6px 10px 9px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button:hover, .tabs a:hover { color: var(--text); }
+.tabs [aria-selected="true"] { color: var(--text); font-weight: 500; border-bottom-color: var(--accent); }
+.tabs .n { margin-left: 5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.pad { height: 14px; }
+.body { flex: 1; min-height: 0; display: flex; }
+.scroll { flex: 1; min-width: 0; overflow: auto; }
+
+/* ---------- agents table ---------- */
+table { width: 100%; border-collapse: collapse; }
+th { position: sticky; top: 0; z-index: 1; background: var(--canvas); text-align: left; font-size: 12px; font-weight: 500; color: var(--muted); padding: 10px 16px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 10px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; color: var(--muted); white-space: nowrap; }
+td:first-child, th:first-child { padding-left: 20px; }
+tbody tr { cursor: pointer; } tbody tr:hover { background: var(--hover); }
+.task { display: block; color: var(--text); font-weight: 500; max-width: 46ch; overflow: hidden; text-overflow: ellipsis; }
+.task-sub { display: block; font-size: 12px; max-width: 52ch; overflow: hidden; text-overflow: ellipsis; }
+.task-sub.warn { color: var(--warning); }
+.num { font-variant-numeric: tabular-nums; color: var(--text); }
+.who-chip { display: inline-flex; align-items: center; gap: 8px; }
+.initials { width: 20px; height: 20px; border-radius: 50%; background: var(--raised); color: var(--text); display: grid; place-items: center; font-size: 9px; font-weight: 600; font-style: normal; flex: none; }
+.state { display: inline-flex; align-items: center; gap: 7px; color: var(--text); }
+.state.failed, .state.cancelled { color: var(--danger); }
+.strip { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.strip div { padding: 10px 16px; } .strip div + div { border-left: 1px solid var(--line); }
+.strip b { color: var(--text); font-weight: 600; margin-right: 6px; font-variant-numeric: tabular-nums; }
+.list { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.empty { margin: auto; padding: 48px 24px; text-align: center; color: var(--muted); max-width: 44ch; }
+.empty b { display: block; color: var(--text); font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.empty a { color: var(--accent); }
+
+/* ---------- conversation ---------- */
+.chat { padding: 20px 28px 28px; max-width: 880px; }
+.day { margin: 18px 0 10px; font-size: 12px; color: var(--faint); }
+.row { display: flex; gap: 10px; margin-top: 14px; align-items: flex-start; }
+.row.cont { margin-top: 4px; }
+.row .gutter { width: 28px; flex: none; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--raised); display: grid; place-items: center; font-size: 11px; font-weight: 600; font-style: normal; }
+.col { min-width: 0; max-width: min(620px, 88%); }
+.col.wide { max-width: 100%; flex: 1; }
+.row.me { justify-content: flex-end; } .row.me .col { display: flex; flex-direction: column; align-items: flex-end; }
+.who { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; margin-bottom: 4px; font-size: 12px; color: var(--muted); }
+.who b { color: var(--text); font-weight: 600; }
+.bubble { padding: 9px 13px; border-radius: 13px 13px 13px 4px; background: var(--panel); border: 1px solid var(--line); overflow-wrap: anywhere; font-size: 13.5px; line-height: 1.55; }
+.bubble + .bubble, .acts + .bubble { margin-top: 6px; }
+.row.me .bubble { border-radius: 13px 13px 4px 13px; background: var(--accent-soft); border-color: transparent; }
+.bubble.live { border-style: dashed; }
+.md p { margin: 0 0 .6em; } .md p:last-child { margin-bottom: 0; }
+.md h5 { margin: .8em 0 .3em; font-size: 13.5px; font-weight: 600; } .md h5:first-child { margin-top: 0; }
+.md ul, .md ol { margin: .3em 0 .6em; padding-left: 1.3em; } .md li { margin: .15em 0; }
+.md code { font-size: 12px; padding: 1px 5px; border-radius: 5px; background: var(--raised); }
+pre.code { margin: .5em 0; padding: 9px 11px; border-radius: 8px; background: var(--canvas); border: 1px solid var(--line); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 380px; overflow: auto; }
+.clamp { max-height: 14.5em; overflow: hidden; } .clamp.open { max-height: none; }
+.more { margin-top: 6px; font-size: 12px; color: var(--accent); font-weight: 500; }
+.acts { margin: 6px 0 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+details.act { max-width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+details.act > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 6px 11px; font-size: 12px; border-radius: 8px; }
+details.act > summary::-webkit-details-marker { display: none; }
+details.act > summary:hover { background: var(--hover); }
+details.act b { font-weight: 500; white-space: nowrap; }
+details.act .hint { font: 11px var(--mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.act .bad { color: var(--danger); }
+details.act .inner { padding: 0 11px 10px; } details.act .inner pre.code { max-height: 280px; }
+details.thought { margin: 4px 0; } details.thought > summary { cursor: pointer; font-size: 12px; color: var(--faint); }
+details.thought div { margin-top: 4px; padding-left: 10px; border-left: 1px solid var(--line); color: var(--muted); font-size: 13px; white-space: pre-wrap; }
+details.sys { margin: 14px 0 0 38px; font-size: 12px; color: var(--faint); } details.sys > summary { cursor: pointer; }
+.error { margin-top: 6px; padding: 8px 11px; border-radius: 8px; background: var(--del-bg); color: var(--danger); font: 12px/1.5 var(--mono); white-space: pre-wrap; }
+.typing { display: flex; align-items: center; gap: 8px; margin: 14px 0 0 38px; font-size: 12px; color: var(--muted); }
+@keyframes pulse { 50% { opacity: .35; } } .typing .dot { background: var(--accent); animation: pulse 1.4s infinite; }
+
+/* ---------- changes ---------- */
+.changes { flex: 0 0 min(46%, 620px); min-width: 0; overflow: auto; background: var(--panel); border-left: 1px solid var(--line); }
+.changes-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+.changes-head b { flex: 1; font-weight: 600; }
+.changes-head span { font: 12px var(--mono); color: var(--muted); }
+.plus { color: var(--success) !important; } .minus { color: var(--danger) !important; }
+details.file > summary { list-style: none; cursor: pointer; display: flex; gap: 10px; align-items: center; padding: 8px 18px; background: var(--raised); font: 12px var(--mono); border-bottom: 1px solid var(--line); }
+details.file > summary::-webkit-details-marker { display: none; }
+details.file > summary span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.patch { overflow-x: auto; border-bottom: 1px solid var(--line); }
+.patch table { font: 11.5px/1.6 var(--mono); }
+.patch td { padding: 0 10px; border: 0; white-space: pre; color: var(--text); }
+.patch td.ln { width: 1%; min-width: 40px; text-align: right; color: var(--faint); user-select: none; font-variant-numeric: tabular-nums; }
+.patch tr.a td { background: var(--add-bg); } .patch tr.d td { background: var(--del-bg); }
+.patch tr.h td { color: var(--muted); padding-top: 3px; padding-bottom: 3px; background: var(--canvas); }
+.patch td.c::before { content: attr(data-s); display: inline-block; width: 14px; color: var(--muted); }
+.patch tr.a td.c::before { color: var(--success); } .patch tr.d td.c::before { color: var(--danger); }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  aside { border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand small, .side-label, .conn { display: none; }
+  .brand { border-bottom: 0; padding-bottom: 6px; }
+  .side-scroll { display: flex; gap: 4px; overflow-x: auto; padding: 0 10px 10px; }
+  .nav-item { flex: none; }
+  .hide-sm { display: none; }
+  .body.split { flex-direction: column; overflow: auto; }
+  .body.split .scroll { overflow: visible; flex: none; }
+  .changes { flex: none; border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .strip { grid-template-columns: repeat(2, 1fr); }
+  .chat { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 221 86.5">
+    <path d="M39.86896 0.25456c9.58536-1.35538 21.90547 2.86566 29.43594 8.76361 10.2254 8.00865 14.94824 17.76843 16.60645 30.43802l45.49727 0.00078c-1.79102-1.88785-3.89649-3.61925-5.83596-5.36059-2.58984-2.32362-5.47654-4.64784-4.03512-8.5253 0.52928-1.43272 1.6035-2.59885 2.98631-3.24558 1.34961-0.61549 2.91406-0.61061 4.28711-0.06953 0.62305 0.25177 1.20703 0.59515 1.72851 1.01883 2.80274 2.27733 6.35936 5.9292 9.08594 8.43818 2.01367 1.85307 9.76563 8.71301 10.51367 10.52077 0.6543 1.54193 0.65038 3.28464-0.00975 4.82384-0.23048 0.5354-0.70314 1.31143-1.11917 1.72396-6.0742 6.02882-12.1582 12.07951-18.37889 17.95615-2.92969 2.70686-7.84764 1.53354-9.13476-2.40077-1.66796-5.1047 4.62304-8.39072 7.44334-11.65524 0.53906-0.62311 1.37502-1.17686 1.75977-1.9152l-0.31054-0.12365c-14.78318-0.24846-30.17988-0.03183-45.00801-0.05098-0.99843 7.22813-4.46855 14.41426-9.04883 20.04324-7.16113 8.75325-17.49512 14.31639-28.74452 15.47431-11.49591 1.20067-22.99356-2.25527-31.92265-9.59533-8.82071-7.17383-14.38438-17.59518-15.4379-28.91641-1.18282-11.47809 2.28652-22.95108 9.63124-31.85025 7.67091-9.23024 18.13888-14.39395 30.01055-15.49286z"/>
+    <path transform="translate(139.96 .15)" d="M34.90039 0.11276c2.59766-0.31409 7.46484 0.08185 10.04297 0.52741 11.30469 1.9693 21.36133 8.35086 27.96094 17.73932 6.49805 9.26385 8.99805 21.33026 7.01953 32.43918-1.98047 11.1597-8.32227 21.07182-17.62305 27.54872-9.42773 6.64957-21.14063 9.21579-32.48633 7.11836-12.21484-2.23575-21.61133-9.00015-28.59765-19.11719 2.85547-2.6801 5.66406-5.4106 8.42187-8.18992 3.05664 5.26625 5.7207 8.20242 10.73827 11.60153 0.7383 0.50647 1.40431 0.90144 2.18556 1.33018 7.31055 3.96321 15.88867 4.87715 23.86914 2.54259 8.16211-2.41231 15.01172-8.00241 19.01172-15.51454 3.99219-7.49768 4.84375-16.27301 2.36914-24.39847-2.41406-7.96374-7.88672-14.64554-15.2168-18.5816-7.40625-4.01868-16.10742-4.92364-24.18164-2.51485-9.52539 2.89633-15.25391 8.75052-19.79492 17.28755-2.87695-2.61935-5.75194-5.38327-8.61914-8.03583 1.3828-2.47012 3.00781-4.79648 4.85156-6.9451 7.75391-9.02808 18.26367-13.96207 30.04883-14.83734z"/>
+  </symbol>
+</svg>
+<div class="app" id="app"></div>
+<script type="module">
+import { html, render, useState, useEffect, useRef, useMemo } from "/preact-htm.js";
+
+const STATUS = { running: "Running", blocked_on_permission: "Needs approval", completed: "Done", failed: "Failed", cancelled: "Cancelled", idle: "Idle" };
+const FILTERS = [["all", "All agents"], ["running", "Running"], ["done", "Done"], ["failed", "Failed"]];
+
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+const base = (path) => { const value = String(path ?? ""); return value.split("/").filter(Boolean).pop() || value; };
+const ago = (ms) => { const seconds = (Date.now() - ms) / 1000; return seconds < 60 ? "just now" : seconds < 3600 ? `${seconds / 60 | 0} min ago` : seconds < 86400 ? `${seconds / 3600 | 0}h ago` : `${seconds / 86400 | 0}d ago`; };
+const clock = (ms) => ms ? new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+const dur = (ms) => { const seconds = ms / 1000 | 0; return seconds < 60 ? `${seconds}s` : seconds < 3600 ? `${seconds / 60 | 0}m ${seconds % 60}s` : `${seconds / 3600 | 0}h ${(seconds % 3600) / 60 | 0}m`; };
+const num = (value) => value >= 1e6 ? `${(value / 1e6).toFixed(1)}M` : value >= 1e3 ? `${Math.round(value / 1e3)}k` : String(value ?? 0);
+const dayLabel = (ms) => {
+  const date = new Date(ms);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  return date.toDateString() === today.toDateString() ? "Today" : date.toDateString() === yesterday.toDateString() ? "Yesterday" : date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+};
+
+// One OpenCode session is one agent. Later jobs on the same session are follow-up rounds,
+// for example a reviewer sending fixes back; jobs are newest first, so the first job seen
+// per session is its latest round and carries the agent's current status.
+const agentsOf = (jobs) => {
+  const seen = new Map();
+  for (const job of jobs) if (!seen.has(job.session_id)) seen.set(job.session_id, job);
+  return [...seen.values()];
+};
+const roundsOf = (jobs, session) => jobs.filter((job) => job.session_id === session).reverse();
+// A follow-up round started by another client records the worktree as its directory, so the
+// project is always taken from the session's first round.
+const projectOf = (jobs, job) => {
+  const first = roundsOf(jobs, job.session_id)[0] || job;
+  return first.worktree?.source_directory || first.directory;
+};
+const tokensOf = (jobs, session) => roundsOf(jobs, session).reduce((total, job) => total + (job.usage?.input || 0) + (job.usage?.output || 0) + (job.usage?.reasoning || 0), 0);
+const statusOf = (active, job) => job.status === "blocked_on_permission" ? job.status : active.has(job.session_id) ? "running" : job.status === "running" ? "idle" : job.status;
+const labelOf = (titles, job) => (titles[job.session_id] || job.job_id).replace(/^gate: /, "");
+// A prompt belongs to the newest round created before it (2s slack for clock skew).
+const senderOf = (jobs, session, at) => {
+  const rounds = roundsOf(jobs, session);
+  let sender = rounds[0];
+  for (const round of rounds) if (round.created_at_ms <= at + 2000) sender = round;
+  return sender;
+};
+// The client that opened the session is the orchestrator; any other client is a peer, such as a reviewer.
+const isSelf = (jobs, session, sender) => (sender?.client || null) === (roundsOf(jobs, session)[0]?.client || null);
+const clientName = (client) => !client ? "Orchestrator" : /claude/i.test(client) ? "Claude Code" : /codex/i.test(client) ? "Codex" : client;
+const initials = (name) => name.split(/[\s_-]+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+const modelName = (model) => model ? model.split("#")[0].split("/").slice(1).join("/") || model : "default model";
+
+const request = async (path) => {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error(`${path}: HTTP ${response.status} ${await response.text()}`);
+  return response.json();
+};
+
+const makeModel = (jobs, active, titles) => ({
+  jobs,
+  agents: agentsOf(jobs),
+  projects: [...new Set(jobs.map((job) => projectOf(jobs, job)))],
+  rounds: (session) => roundsOf(jobs, session),
+  project: (job) => projectOf(jobs, job),
+  status: (job) => statusOf(active, job),
+  label: (job) => labelOf(titles, job),
+  tokens: (session) => tokensOf(jobs, session),
+  sender: (session, at) => senderOf(jobs, session, at),
+  isSelf: (session, sender) => isSelf(jobs, session, sender),
+  inProject: (project) => agentsOf(jobs.filter((job) => !project || projectOf(jobs, job) === project)),
+});
+
+const parseRoute = (hash, gate) => {
+  const [, view = "agents", argument] = hash.slice(1).split("/").map(decodeURIComponent);
+  if (view === "session") {
+    const picked = gate.jobs.find((job) => job.job_id === argument);
+    const job = picked && gate.agents.find((agent) => agent.session_id === picked.session_id);
+    return { view, job, project: job ? gate.project(job) : null };
+  }
+  if (view === "chat") return { view, project: gate.projects.includes(argument) ? argument : gate.projects[0] || null };
+  if (view === "approval") return { view, project: null };
+  return { view: "agents", project: gate.projects.includes(argument) ? argument : null };
+};
+
+const visibleJobs = (gate, route) => {
+  if (route.view === "session") return route.job ? [route.job] : [];
+  if (route.view === "chat") return gate.inProject(route.project);
+  return [];
+};
+
+const inline = (text) => esc(text).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+const prose = (text) => {
+  let markup = "";
+  let list = null;
+  let paragraph = [];
+  const endParagraph = () => {
+    if (paragraph.length) markup += `<p>${paragraph.join("<br>")}</p>`;
+    paragraph = [];
+  };
+  const endList = () => {
+    if (list) markup += `</${list}>`;
+    list = null;
+  };
+  for (const line of text.split("\n")) {
+    let match;
+    if (!line.trim()) { endParagraph(); endList(); }
+    else if ((match = line.match(/^#{1,6}\s+(.*)/))) { endParagraph(); endList(); markup += `<h5>${inline(match[1])}</h5>`; }
+    else if ((match = line.match(/^\s*(?:[-*]|(\d+)\.)\s+(.*)/))) {
+      endParagraph();
+      const kind = match[1] ? "ol" : "ul";
+      if (list !== kind) { endList(); markup += `<${kind}>`; list = kind; }
+      markup += `<li>${inline(match[2])}</li>`;
+    } else { endList(); paragraph.push(inline(line)); }
+  }
+  endParagraph(); endList();
+  return markup;
+};
+const md = (source) => String(source ?? "").split("```").map((part, index) => {
+  if (index % 2 === 0) return prose(part);
+  const newline = part.indexOf("\n");
+  return `<pre class="code">${esc((newline >= 0 ? part.slice(newline + 1) : part).replace(/\n$/, ""))}</pre>`;
+}).join("");
+
+const ICONS = {
+  agents: () => html`<circle cx="8" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20a5 5 0 0 1 10 0M14 20a4 4 0 0 1 7-2.5" />`,
+  approval: () => html`<path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z" /><path d="M12 8v5M12 16h.01" />`,
+  chat: () => html`<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />`,
+  folder: () => html`<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />`,
+  terminal: () => html`<path d="M5 7l5 5-5 5M12 17h7" />`,
+  file: () => html`<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" />`,
+  edit: () => html`<path d="M4 20h4L19 9l-4-4L4 16z" />`,
+  search: () => html`<circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5" />`,
+  tool: () => html`<circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" />`,
+};
+const Icon = ({ name }) => html`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${(ICONS[name] || ICONS.tool)()}</svg>`;
+const toolIcon = (name) => /shell|bash|exec/.test(name) ? "terminal" : /read|view|list/.test(name) ? "file" : /edit|write|patch/.test(name) ? "edit" : /grep|glob|search|find/.test(name) ? "search" : "tool";
+
+const useExpanded = () => {
+  const [keys, setKeys] = useState(() => new Set());
+  const has = (key) => keys.has(key);
+  const toggle = (key) => setKeys((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
+  return { has, toggle };
+};
+
+const useOpenDetails = () => {
+  const keys = useRef(new Set());
+  return {
+    isOpen: (id) => keys.current.has(id),
+    markOpen: (id, open) => {
+      if (open) keys.current.add(id);
+      else keys.current.delete(id);
+    },
+    isFileOpen: (id) => !keys.current.has(`closed:${id}`),
+    markFileOpen: (id, open) => {
+      const key = `closed:${id}`;
+      if (open) keys.current.delete(key);
+      else keys.current.add(key);
+    },
+  };
+};
+
+const useScrollBox = (name, { positions, hash, pinned, setPinned }) => {
+  const ref = useRef(null);
+  const onScroll = () => {
+    const element = ref.current;
+    if (!element) return;
+    positions.current[name] = { hash, top: element.scrollTop };
+    if (setPinned) setPinned(element.scrollHeight - element.scrollTop - element.clientHeight < 120);
+  };
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const saved = positions.current[name];
+    if (saved && saved.hash === hash) element.scrollTop = saved.top;
+    if (pinned) element.scrollTop = element.scrollHeight;
+  });
+  return { ref, onScroll };
+};
+
+const Bubble = ({ text, live, clampKey, expanded, onExpand }) => {
+  if (live) return html`<div class="md" dangerouslySetInnerHTML=${{ __html: text ? md(text) : "…" }}></div>`;
+  const long = text.length > 900 || text.split("\n").length > 14;
+  if (!long) return html`<div class="md" dangerouslySetInnerHTML=${{ __html: md(text) }}></div>`;
+  const open = expanded.has(clampKey);
+  return [
+    html`<div class=${open ? "md clamp open" : "md clamp"} dangerouslySetInnerHTML=${{ __html: md(text) }}></div>`,
+    html`<button class="more" onClick=${() => onExpand(clampKey)}>${open ? "Show less" : "Show more"}</button>`,
+  ];
+};
+
+const Message = ({ me, name, note, at, text, cont, live, clampKey, expanded, onExpand }) => {
+  const who = cont ? null : html`<div class="who"><b>${name}</b>${note ? html`<span>${note}</span>` : null}<time>${live ? "typing" : clock(at)}</time></div>`;
+  const gutter = me ? null : html`<div class="gutter">${cont ? null : html`<i class="avatar">${name[0].toUpperCase()}</i>`}</div>`;
+  return html`<div class=${`row ${me ? "me" : ""} ${cont ? "cont" : ""}`}>
+    ${gutter}
+    <div class="col">
+      ${who}
+      <div class=${live ? "bubble live" : "bubble"}><${Bubble} text=${text} live=${live} clampKey=${clampKey} expanded=${expanded} onExpand=${onExpand} /></div>
+    </div>
+  </div>`;
+};
+
+const SystemNote = ({ message, openDetails }) => html`<details class="sys" open=${openDetails.isOpen(`sys-${message.id}`)} onToggle=${(event) => openDetails.markOpen(`sys-${message.id}`, event.currentTarget.open)}>
+  <summary>${message.description || "Context updated"}</summary>
+  <pre class="code">${message.text}</pre>
+</details>`;
+
+const Thought = ({ id, text, openDetails }) => html`<details class="thought" open=${openDetails.isOpen(id)} onToggle=${(event) => openDetails.markOpen(id, event.currentTarget.open)}>
+  <summary>Thinking</summary>
+  <div>${text}</div>
+</details>`;
+
+const ToolCall = ({ id, block, job, openDetails }) => {
+  const state = block.state || {};
+  const input = state.input && typeof state.input === "object" ? state.input : {};
+  // Paths inside the agent's own checkout read better relative to it.
+  const hint = String(["command", "filePath", "path", "pattern", "query", "url"].map((key) => input[key]).find(Boolean) || "").split(`${job.directory}/`).join("").split(job.directory).join(".");
+  const output = Array.isArray(state.content) ? state.content.map((item) => item.text ?? JSON.stringify(item)).join("\n") : state.content ?? state.output ?? state.error ?? "";
+  const failed = state.status === "error";
+  return html`<details class="act" open=${openDetails.isOpen(id)} onToggle=${(event) => openDetails.markOpen(id, event.currentTarget.open)}>
+    <summary>
+      <${Icon} name=${toolIcon(block.name || "")} />
+      <b class=${failed ? "bad" : ""}>${block.name}${failed ? " failed" : ""}</b>
+      <span class="hint">${hint}</span>
+    </summary>
+    <div class="inner">
+      <pre class="code">${input.command ? `$ ${input.command}` : JSON.stringify(state.input ?? {}, null, 2)}</pre>
+      ${output ? html`<pre class="code">${typeof output === "string" ? output : JSON.stringify(output, null, 2)}</pre>` : null}
+    </div>
+  </details>`;
+};
+
+const Step = ({ job, message, expanded, onExpand, openDetails }) => {
+  const parts = [];
+  let actions = [];
+  const flush = () => {
+    if (actions.length) parts.push(html`<div class="acts" key=${`acts-${parts.length}`}>${actions}</div>`);
+    actions = [];
+  };
+  (message.content || []).forEach((block, index) => {
+    const id = `${message.id}-${index}`;
+    if (block.type === "tool") {
+      actions.push(html`<${ToolCall} key=${id} id=${id} block=${block} job=${job} openDetails=${openDetails} />`);
+      return;
+    }
+    flush();
+    if (block.type === "text" && block.text?.trim()) {
+      parts.push(html`<div class="bubble" key=${id}><${Bubble} text=${block.text} clampKey=${id} expanded=${expanded} onExpand=${onExpand} /></div>`);
+    } else if (block.type === "reasoning" && block.text?.trim()) {
+      parts.push(html`<${Thought} key=${id} id=${id} text=${block.text} openDetails=${openDetails} />`);
+    }
+  });
+  flush();
+  if (message.error) parts.push(html`<div class="error" key="error">${typeof message.error === "string" ? message.error : JSON.stringify(message.error, null, 2)}</div>`);
+  if (!parts.length) return null;
+  const name = message.agent || job.agent || "agent";
+  return html`<div class="row">
+    <div class="gutter"><i class="avatar">${name[0].toUpperCase()}</i></div>
+    <div class="col wide">
+      <div class="who"><b>${name}</b><time>${clock(message.time?.created)}</time></div>
+      ${parts}
+    </div>
+  </div>`;
+};
+
+const Entry = ({ job, gate, message, expanded, onExpand, openDetails }) => {
+  if (message.type === "user") {
+    const sender = gate.sender(job.session_id, message.time?.created || 0);
+    return html`<${Message} me=${gate.isSelf(job.session_id, sender)} name=${clientName(sender?.client)} at=${message.time?.created} text=${message.text || ""} clampKey=${message.id} expanded=${expanded} onExpand=${onExpand} />`;
+  }
+  if (message.type === "system") return html`<${SystemNote} message=${message} openDetails=${openDetails} />`;
+  return html`<${Step} job=${job} message=${message} expanded=${expanded} onExpand=${onExpand} openDetails=${openDetails} />`;
+};
+
+const Transcript = ({ job, gate, messages, liveText, expanded, onExpand, openDetails }) => {
+  const session = job.session_id;
+  const list = messages[session];
+  if (!list) return html`<div class="empty"><b>Loading the conversation</b></div>`;
+  const entries = list.map((message) => html`<${Entry} key=${message.id} job=${job} gate=${gate} message=${message} expanded=${expanded} onExpand=${onExpand} openDetails=${openDetails} />`);
+  const streaming = liveText[session];
+  const live = streaming !== undefined
+    ? html`<${Message} key="live" name=${job.agent || "agent"} text=${streaming} live=${true} clampKey=${`live-${session}`} expanded=${expanded} onExpand=${onExpand} />`
+    : gate.status(job) === "running"
+      ? html`<div class="typing"><i class="dot"></i>${job.agent || "The agent"} is working</div>`
+      : null;
+  return html`<div class="chat">
+    ${entries.length ? entries : html`<div class="empty"><b>Nothing here yet</b>The task and the agent's replies will appear as soon as it starts.</div>`}
+    ${live}
+  </div>`;
+};
+
+// Hunk headers carry the starting line numbers; count from there.
+const Patch = ({ patch }) => {
+  let oldNumber = 0;
+  let newNumber = 0;
+  const rows = [];
+  for (const line of patch.split("\n")) {
+    const hunk = line.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      oldNumber = +hunk[1];
+      newNumber = +hunk[2];
+      rows.push(html`<tr class="h" key=${rows.length}><td class="ln"></td><td class="ln"></td><td>${line}</td></tr>`);
+      continue;
+    }
+    if (/^(diff |index |--- |\+\+\+ |new file|deleted file|similarity|rename |old mode|new mode)/.test(line) || (!line && !rows.length)) continue;
+    if (line.startsWith("\\")) continue;
+    const sign = line[0];
+    const text = line.slice(1);
+    if (sign === "+") rows.push(html`<tr class="a" key=${rows.length}><td class="ln"></td><td class="ln">${newNumber++}</td><td class="c" data-s="+">${text}</td></tr>`);
+    else if (sign === "-") rows.push(html`<tr class="d" key=${rows.length}><td class="ln">${oldNumber++}</td><td class="ln"></td><td class="c" data-s="−">${text}</td></tr>`);
+    else if (oldNumber || newNumber) rows.push(html`<tr key=${rows.length}><td class="ln">${oldNumber++}</td><td class="ln">${newNumber++}</td><td class="c" data-s=" ">${text}</td></tr>`);
+  }
+  return html`<table>${rows}</table>`;
+};
+
+const FileDiff = ({ file, id, openDetails }) => html`<details class="file" open=${openDetails.isFileOpen(id)} onToggle=${(event) => openDetails.markFileOpen(id, event.currentTarget.open)}>
+  <summary>
+    <span title=${file.file}>${file.file}</span>
+    <span class="plus">+${file.additions || 0}</span>
+    <span class="minus">−${file.deletions || 0}</span>
+  </summary>
+  <div class="patch"><${Patch} patch=${file.patch || ""} /></div>
+</details>`;
+
+const Changes = ({ files, job, gate, openDetails }) => {
+  const head = (extra) => html`<div class="changes-head"><b>Changes</b>${extra}</div>`;
+  if (!files) return [head(null), html`<div class="empty"><b>Loading changes</b></div>`];
+  if (!files.length) {
+    const empty = gate.status(job) === "running" ? "Edits show up here as the agent makes them." : "This agent didn't change any tracked files.";
+    return [head(null), html`<div class="empty"><b>No changes yet</b>${empty}</div>`];
+  }
+  const additions = files.reduce((total, file) => total + (file.additions || 0), 0);
+  const deletions = files.reduce((total, file) => total + (file.deletions || 0), 0);
+  return [
+    head(html`<span>${files.length} file${files.length === 1 ? "" : "s"}</span><span class="plus">+${additions}</span><span class="minus">−${deletions}</span>`),
+    ...files.map((file) => html`<${FileDiff} key=${file.file} file=${file} id=${`file-${job.session_id}-${file.file}`} openDetails=${openDetails} />`),
+  ];
+};
+
+const NavItem = ({ href, icon, text, count, current, alert }) => html`<a class="nav-item" href=${href} aria-current=${current ? "page" : null}>
+  <${Icon} name=${icon} />
+  <span>${text}</span>
+  ${count !== "" ? html`<i class=${alert ? "count alert" : "count"}>${count}</i>` : null}
+</a>`;
+
+const Sidebar = ({ gate, route, connection, ready }) => {
+  const waiting = gate.agents.filter((job) => gate.status(job) === "blocked_on_permission").length;
+  const chatProject = route.project || gate.projects[0];
+  return html`<aside>
+    <a class="brand" href="#/agents">
+      <span class="tile"><svg viewBox="0 0 221 86.5" aria-hidden="true"><use href="#mark" /></svg></span>
+      <span><b>Gate</b><small>Agent hand-offs</small></span>
+    </a>
+    <nav class="side-scroll" aria-label="Main">
+      ${ready ? html`
+        <${NavItem} href="#/agents" icon="agents" text="Agents" count=${gate.agents.length} current=${route.view === "agents" && !route.project} />
+        <${NavItem} href="#/approval" icon="approval" text="Needs approval" count=${waiting} current=${route.view === "approval"} alert=${waiting > 0} />
+        ${chatProject ? html`<${NavItem} href=${`#/chat/${encodeURIComponent(chatProject)}`} icon="chat" text="Group chat" count="" current=${route.view === "chat"} />` : null}
+        ${gate.projects.length ? html`<div class="side-label">PROJECTS</div>` : null}
+        ${gate.projects.map((project) => html`<${NavItem} key=${project} href=${`#/agents/${encodeURIComponent(project)}`} icon="folder" text=${base(project)} count=${gate.inProject(project).length} current=${route.view === "agents" && route.project === project} />`)}
+      ` : null}
+    </nav>
+    <div class=${connection.on ? "conn on" : "conn"}><i class="dot"></i><span>${connection.text}</span></div>
+  </aside>`;
+};
+
+const State = ({ job, gate }) => {
+  const value = gate.status(job);
+  return html`<span class=${`state ${value}`}><i class=${`dot ${value}`}></i>${STATUS[value] || value}</span>`;
+};
+
+const AgentRow = ({ job, gate }) => {
+  const first = gate.rounds(job.session_id)[0];
+  const by = clientName(first?.client);
+  const pending = job.pending_permission;
+  const href = `#/session/${job.job_id}`;
+  return html`<tr onClick=${(event) => { if (!event.target.closest("a")) location.hash = href; }}>
+    <td>
+      <a class="task" href=${href}>${gate.label(job)}</a>
+      ${pending
+        ? html`<span class="task-sub warn">Wants to ${pending.action}: ${(pending.resources || []).join(", ") || pending.message || ""}</span>`
+        : html`<span class="task-sub">${job.agent || "agent"} · ${modelName(job.model)}</span>`}
+    </td>
+    <td class="hide-sm">${base(gate.project(job))}</td>
+    <td class="num hide-sm">${num(gate.tokens(job.session_id))}</td>
+    <td>${ago(job.created_at_ms)}</td>
+    <td class="hide-sm"><span class="who-chip"><i class="initials">${initials(by)}</i>${by}</span></td>
+    <td><${State} job=${job} gate=${gate} /></td>
+  </tr>`;
+};
+
+const AgentList = ({ gate, route, filter, onFilter, scroll }) => {
+  const list = useScrollBox("list", scroll);
+  const approval = route.view === "approval";
+  const scope = gate.inProject(route.project);
+  const matches = {
+    all: () => true,
+    running: (job) => gate.status(job) === "running",
+    done: (job) => gate.status(job) === "completed",
+    failed: (job) => ["failed", "cancelled"].includes(gate.status(job)),
+  };
+  const rows = approval ? scope.filter((job) => gate.status(job) === "blocked_on_permission") : scope.filter(matches[filter]);
+  const running = scope.filter(matches.running).length;
+  const used = scope.reduce((total, job) => total + gate.tokens(job.session_id), 0);
+  const waiting = scope.filter((job) => gate.status(job) === "blocked_on_permission").length;
+  const head = html`<div class="head">
+    <div class="head-row">
+      <h1>${approval ? "Needs approval" : route.project ? base(route.project) : "Agents"}</h1>
+      ${!approval && running ? html`<span class="badge running"><i class="dot running"></i>${running} running</span>` : null}
+    </div>
+    ${route.project ? html`<div class="facts"><span class="mono">${route.project}</span></div>` : null}
+    ${approval ? html`<div class="pad"></div>` : html`<div class="tabs" role="tablist">
+      ${FILTERS.map(([key, text]) => html`<button role="tab" aria-selected=${filter === key ? "true" : "false"} onClick=${() => onFilter(key)}>${text}<span class="n">${scope.filter(matches[key]).length}</span></button>`)}
+    </div>`}
+  </div>`;
+  if (!gate.jobs.length) return [head, html`<div class="empty"><b>No agents yet</b>When Claude Code or Codex hands a task to another model through Gate, it shows up here.</div>`];
+  if (!rows.length) {
+    const message = approval ? "When an agent wants to run something risky, the request appears here. You answer it from Claude Code or Codex." : "Try another tab, or pick a different project.";
+    return [head, html`<div class="empty"><b>${approval ? "Nothing is waiting for you" : "No agents match this filter"}</b>${message}</div>`];
+  }
+  return [
+    head,
+    html`<div class="list">
+      <div class="scroll" data-scroll="list" ref=${list.ref} onScroll=${list.onScroll}>
+        <table>
+          <thead><tr><th>Task</th><th class="hide-sm">Project</th><th class="hide-sm">Tokens</th><th>Started</th><th class="hide-sm">Handed off by</th><th>Status</th></tr></thead>
+          <tbody>${rows.map((job) => html`<${AgentRow} key=${job.job_id} job=${job} gate=${gate} />`)}</tbody>
+        </table>
+      </div>
+      <div class="strip">
+        <div><b>${rows.length}</b>in view</div>
+        <div><b>${running}</b>running</div>
+        <div><b>${num(used)}</b>tokens used by agents</div>
+        <div><b>${waiting}</b>waiting for you</div>
+      </div>
+    </div>`,
+  ];
+};
+
+const GroupChat = ({ gate, route, messages, liveText, expanded, onExpand, pin, scroll }) => {
+  const chat = useScrollBox("chat", { ...scroll, ...pin });
+  const own = gate.inProject(route.project);
+  const lines = [];
+  for (const job of own) {
+    for (const message of messages[job.session_id] || []) {
+      const at = message.time?.created || 0;
+      if (message.type === "user" && message.text) {
+        const sender = gate.sender(job.session_id, at);
+        lines.push({ key: message.id, at, me: gate.isSelf(job.session_id, sender), name: clientName(sender?.client), note: `to ${gate.label(job)}`, job, text: message.text });
+      } else if (message.type === "assistant") {
+        const text = (message.content || []).filter((block) => block.type === "text").map((block) => block.text).join("\n").trim();
+        if (text) lines.push({ key: message.id, at, me: false, name: gate.label(job), note: job.agent || "agent", job, text });
+      }
+    }
+    if (liveText[job.session_id] !== undefined) {
+      lines.push({ key: `live-${job.session_id}`, at: Infinity, me: false, name: gate.label(job), job, text: liveText[job.session_id], live: true });
+    }
+  }
+  lines.sort((a, b) => a.at - b.at);
+  const items = [];
+  let lastDay = "";
+  let previous = null;
+  for (const line of lines) {
+    const day = line.live ? lastDay : dayLabel(line.at);
+    if (day !== lastDay) {
+      items.push(html`<div class="day" key=${`day-${items.length}`}>${day}</div>`);
+      lastDay = day;
+      previous = null;
+    }
+    const cont = previous !== null && previous.name === line.name && previous.me === line.me && previous.job === line.job && (line.live || line.at - previous.at < 300000);
+    items.push(html`<${Message} key=${line.key} me=${line.me} name=${line.name} note=${line.note} at=${line.at} text=${line.text} cont=${cont} live=${line.live} clampKey=${line.key} expanded=${expanded} onExpand=${onExpand} />`);
+    previous = line;
+  }
+  const loading = own.some((job) => !messages[job.session_id]);
+  const empty = !route.project
+    ? html`<div class="empty"><b>No projects yet</b>The group chat shows what the orchestrator and its agents say to each other in one project.</div>`
+    : html`<div class="empty"><b>${loading ? "Loading the conversation" : "Nothing said yet"}</b>${loading ? "" : "Messages between the orchestrator and the agents in this project will appear here."}</div>`;
+  const tabs = gate.projects.length > 1
+    ? html`<div class="tabs">${gate.projects.map((project) => html`<a href=${`#/chat/${encodeURIComponent(project)}`} aria-selected=${project === route.project ? "true" : "false"}>${base(project)}</a>`)}</div>`
+    : html`<div class="pad"></div>`;
+  return [
+    html`<div class="head">
+      <div class="head-row">
+        <h1>Group chat</h1>
+        ${route.project ? html`<span class="badge">${own.length} agent${own.length === 1 ? "" : "s"}</span>` : null}
+      </div>
+      ${tabs}
+    </div>`,
+    html`<div class="body">
+      <div class="scroll" data-scroll="chat" ref=${chat.ref} onScroll=${chat.onScroll}>
+        ${items.length ? html`<div class="chat">${items}</div>` : empty}
+      </div>
+    </div>`,
+  ];
+};
+
+const Session = ({ gate, route, messages, diffs, liveText, openDetails, expanded, pin, scroll }) => {
+  const job = route.job;
+  const transcript = useScrollBox("session", { ...scroll, ...pin });
+  const changes = useScrollBox("changes", scroll);
+  if (!job) {
+    return [
+      html`<div class="head"><div class="head-row"><h1>Agent not found</h1></div><div class="pad"></div></div>`,
+      html`<div class="empty"><b>This agent is no longer listed</b><a href="#/agents">Back to all agents</a></div>`,
+    ];
+  }
+  const session = job.session_id;
+  const rounds = gate.rounds(session).length;
+  const status = gate.status(job);
+  const elapsed = status === "running" ? Date.now() - job.created_at_ms : job.elapsed_ms;
+  const pending = job.pending_permission;
+  const project = gate.project(job);
+  return [
+    html`<div class="head">
+      <div class="head-row">
+        <h1>${gate.label(job)}</h1>
+        <span class=${`badge ${status}`}><i class=${`dot ${status}`}></i>${STATUS[status] || status}</span>
+      </div>
+      <div class="facts">
+        <a href=${`#/agents/${encodeURIComponent(project)}`}>${base(project)}</a>
+        <span class="mono">${modelName(job.model)}</span>
+        <span>${num(gate.tokens(session))} tokens</span>
+        <span>${dur(elapsed || 0)}</span>
+        ${job.worktree ? html`<span class="mono" title=${job.directory ?? ""}>${job.worktree.branch || "separate worktree"}</span>` : null}
+        ${rounds > 1 ? html`<span>${rounds - 1} follow-up round${rounds > 2 ? "s" : ""}</span>` : null}
+      </div>
+      ${pending ? html`<div class="facts" style="color:var(--warning)"><span>Waiting for approval to ${pending.action}: ${(pending.resources || []).join(", ")}</span></div>` : null}
+      ${job.error ? html`<div class="error">${job.error}</div>` : null}
+      <div class="pad"></div>
+    </div>`,
+    html`<div class="body split">
+      <div class="scroll" data-scroll="session" ref=${transcript.ref} onScroll=${transcript.onScroll}>
+        <${Transcript} job=${job} gate=${gate} messages=${messages} liveText=${liveText} expanded=${expanded} onExpand=${expanded.toggle} openDetails=${openDetails} />
+      </div>
+      <section class="changes" data-scroll="changes" aria-label="Changes" ref=${changes.ref} onScroll=${changes.onScroll}>
+        <${Changes} files=${diffs[session]} job=${job} gate=${gate} openDetails=${openDetails} />
+      </section>
+    </div>`,
+  ];
+};
+
+const App = () => {
+  const [jobs, setJobs] = useState([]);
+  const [active, setActive] = useState(() => new Set());
+  const [titles, setTitles] = useState({});
+  const [messages, setMessages] = useState({});
+  const [diffs, setDiffs] = useState({});
+  const [liveText, setLiveText] = useState({});
+  const [filter, setFilter] = useState("all");
+  const [hash, setHash] = useState(() => location.hash);
+  const [pinned, setPinned] = useState(true);
+  const [connection, setConnection] = useState({ on: false, text: "Connecting" });
+  const [startupError, setStartupError] = useState(null);
+  const [ready, setReady] = useState(false);
+
+  const gate = useMemo(() => makeModel(jobs, active, titles), [jobs, active, titles]);
+  const route = useMemo(() => parseRoute(hash, gate), [hash, gate]);
+  const expanded = useExpanded();
+  const openDetails = useOpenDetails();
+  const positions = useRef({});
+  const timers = useRef({});
+  const jobsRef = useRef(jobs);
+  const activeRef = useRef(active);
+  const titlesRef = useRef(titles);
+  const gateRef = useRef(gate);
+  const routeRef = useRef(route);
+  jobsRef.current = jobs;
+  activeRef.current = active;
+  titlesRef.current = titles;
+  gateRef.current = gate;
+  routeRef.current = route;
+
+  const loadJobs = async () => {
+    const list = (await request("/api/jobs")).sort((a, b) => b.created_at_ms - a.created_at_ms);
+    setJobs(list);
+    await Promise.all(list.map(async (job) => {
+      if (titlesRef.current[job.session_id] !== undefined) return;
+      const info = await request(`/oc/api/session/${job.session_id}`).catch(() => null);
+      setTitles((current) => current[job.session_id] !== undefined ? current : { ...current, [job.session_id]: info?.data?.title || job.job_id });
+    }));
+  };
+
+  const loadActive = async () => {
+    const response = await request("/oc/api/session/active").catch(() => ({ data: {} }));
+    setActive(new Set(Object.keys(response.data || {})));
+  };
+
+  const loadMessages = async (session) => {
+    const all = [];
+    let cursor = null;
+    do {
+      const query = cursor ? `cursor=${encodeURIComponent(cursor)}` : "order=asc";
+      const page = await request(`/oc/api/session/${session}/message?limit=100&${query}`);
+      all.push(...page.data);
+      cursor = page.cursor?.next;
+    } while (cursor);
+    setMessages((current) => ({ ...current, [session]: all }));
+    setLiveText((current) => {
+      const next = { ...current };
+      delete next[session];
+      return next;
+    });
+  };
+
+  const loadDiff = async (job) => {
+    const query = new URLSearchParams();
+    const first = roundsOf(jobsRef.current, job.session_id)[0] || job;
+    if (first.first_message_id) query.set("from", first.first_message_id);
+    if (job.last_message_id && statusOf(activeRef.current, job) !== "running") query.set("to", job.last_message_id);
+    const response = await request(`/oc/api/session/${job.session_id}/diff?${query}`);
+    setDiffs((current) => ({ ...current, [job.session_id]: response.data }));
+  };
+
+  const refreshView = async () => {
+    const current = routeRef.current;
+    await Promise.all(visibleJobs(gateRef.current, current).map((job) => loadMessages(job.session_id).catch((error) => console.warn(error))));
+    if (current.view !== "session" || !current.job) return;
+    await loadDiff(current.job).catch((error) => {
+      setDiffs((previous) => ({ ...previous, [current.job.session_id]: [] }));
+      console.warn(error);
+    });
+  };
+
+  const soon = (key, ms, run) => {
+    if (timers.current[key]) return;
+    timers.current[key] = setTimeout(() => {
+      delete timers.current[key];
+      run().catch((error) => console.warn(error));
+    }, ms);
+  };
+
+  const showConnection = (on, text) => setConnection((current) => current.on === on && current.text === text ? current : { on, text });
+
+  useEffect(() => {
+    let cancelled = false;
+    const start = async () => {
+      try {
+        await Promise.all([loadJobs(), loadActive()]);
+      } catch (error) {
+        if (!cancelled) setStartupError(error.message);
+        return;
+      }
+      if (!cancelled) setReady(true);
+    };
+    start();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const onHash = () => {
+      setPinned(true);
+      setHash(location.hash);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    refreshView().catch((error) => console.warn(error));
+  }, [ready, hash]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const source = new EventSource("/oc/api/event");
+    source.onopen = () => showConnection(true, "Live");
+    source.onerror = () => showConnection(false, "Reconnecting");
+    source.onmessage = (frame) => {
+      let event;
+      try { event = JSON.parse(frame.data); } catch { return; }
+      const session = event.data?.sessionID;
+      const job = session && jobsRef.current.find((item) => item.session_id === session);
+      if (!job) {
+        if (event.type === "session.created") soon("jobs", 1500, loadJobs);
+        return;
+      }
+      if (event.type.startsWith("session.execution") || event.type === "session.idle" || event.type.startsWith("permission.")) {
+        soon("active", 300, async () => { await loadActive(); await loadJobs(); });
+      }
+      if (!visibleJobs(gateRef.current, routeRef.current).some((item) => item.session_id === session)) return;
+      if (event.type === "session.text.delta") {
+        setLiveText((current) => ({ ...current, [session]: (current[session] || "") + (event.data.delta || "") }));
+        return;
+      }
+      soon(`msg-${session}`, 600, () => loadMessages(session));
+      if (routeRef.current.view === "session" && /tool|execution|idle/.test(event.type)) soon(`diff-${session}`, 1200, () => loadDiff(job));
+    };
+    // New jobs from any Gate process, and a slow safety net for missed events.
+    const syncTimer = setInterval(async () => {
+      await loadJobs().catch(() => {});
+      await loadActive().catch((error) => console.warn(error));
+    }, 5000);
+    const refreshTimer = setInterval(() => refreshView().catch((error) => console.warn(error)), 30000);
+    return () => {
+      source.close();
+      clearInterval(syncTimer);
+      clearInterval(refreshTimer);
+      for (const timer of Object.values(timers.current)) clearTimeout(timer);
+      timers.current = {};
+    };
+  }, [ready]);
+
+  const pin = { pinned, setPinned };
+  const scroll = { positions, hash };
+  const content = () => {
+    if (startupError) return html`<div class="empty"><b>Can't reach Gate</b>${startupError}</div>`;
+    if (!ready) return null;
+    if (route.view === "session") {
+      return html`<${Session} key=${hash} gate=${gate} route=${route} messages=${messages} diffs=${diffs} liveText=${liveText} openDetails=${openDetails} expanded=${expanded} pin=${pin} scroll=${scroll} />`;
+    }
+    if (route.view === "chat") {
+      return html`<${GroupChat} key=${hash} gate=${gate} route=${route} messages=${messages} liveText=${liveText} expanded=${expanded} onExpand=${expanded.toggle} pin=${pin} scroll=${scroll} />`;
+    }
+    return html`<${AgentList} key=${hash} gate=${gate} route=${route} filter=${filter} onFilter=${setFilter} scroll=${scroll} />`;
+  };
+
+  return html`
+    <${Sidebar} gate=${gate} route=${route} connection=${connection} ready=${ready} />
+    <main>${content()}</main>
+  `;
+};
+
+render(html`<${App} />`, document.getElementById("app"));
+</script>
+</body>
+</html>

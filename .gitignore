@@ -1,0 +1,5 @@
+/target
+__pycache__/
+# Assets imported from third-party sites while designing; not ours to republish
+/design/images/
+/design/fonts/

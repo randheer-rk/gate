@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "gate": {
+      "command": "gate",
+      "args": ["mcp"],
+      "env": { "GATE_PERMISSION_MODE": "guarded" }
+    }
+  }
+}

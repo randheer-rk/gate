@@ -1,0 +1,40 @@
+[package]
+name = "gate"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+description = "MCP gateway that exposes OpenCode as a coding backend for Claude Code and Codex"
+license = "MIT"
+include = ["src/**", "Cargo.*", "README.md", "LICENSE", "DICTIONARY.md", "docs/**", "scripts/**", "tests/*.py", "plugins/**"]
+
+[[bin]]
+name = "gate"
+path = "src/main.rs"
+
+[lib]
+name = "gate"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+bytes = "1"
+clap = { version = "4", features = ["derive"] }
+futures-util = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+rmcp = { version = "3.9", features = ["server", "transport-io", "macros"] }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "signal", "net", "io-util"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

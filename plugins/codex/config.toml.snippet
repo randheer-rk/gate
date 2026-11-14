@@ -1,0 +1,10 @@
+# Merge this table into ~/.codex/config.toml after installing gate on PATH.
+# https://developers.openai.com/codex/mcp
+[mcp_servers.gate]
+command = "gate"
+args = ["mcp"]
+startup_timeout_sec = 20
+tool_timeout_sec = 180
+
+[mcp_servers.gate.env]
+GATE_PERMISSION_MODE = "guarded"
